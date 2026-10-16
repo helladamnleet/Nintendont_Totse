@@ -121,3 +121,34 @@ FRESULT f_opendir_char(DIR* dp, const char* path)
 	return f_opendir(dp, tmpwchar.u16);
 }
 #endif /* _FS_MINIMIZE <= 1 */
+
+#if _FS_MINIMIZE == 0
+FRESULT f_stat_char(const char* path, FILINFO* fno)
+{
+	if (!char_to_wchar(path))
+		return FR_INVALID_NAME;
+	return f_stat(tmpwchar.u16, fno);
+}
+
+FRESULT f_unlink_char(const char* path)
+{
+	if (!char_to_wchar(path))
+		return FR_INVALID_NAME;
+	return f_unlink(tmpwchar.u16);
+}
+
+FRESULT f_rename_char(const char* path_old, const char* path_new)
+{
+	WCHAR oldname[512];
+	size_t i;
+
+	if (!char_to_wchar(path_old))
+		return FR_INVALID_NAME;
+	for (i = 0; i < 511 && tmpwchar.u16[i] != 0; i++)
+		oldname[i] = tmpwchar.u16[i];
+	oldname[i] = 0;
+	if (!char_to_wchar(path_new))
+		return FR_INVALID_NAME;
+	return f_rename(oldname, tmpwchar.u16);
+}
+#endif /* _FS_MINIMIZE == 0 */

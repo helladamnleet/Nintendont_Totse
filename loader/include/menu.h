@@ -66,6 +66,7 @@ typedef struct GameInfo
 // Disc format colors.
 extern const u32 DiscFormatColors[8];
 
+extern u32 Shutdown;
 void SetShutdown(void);
 void HandleSTMEvent(u32 event);
 void HandleWiiMoteEvent(s32 chan);

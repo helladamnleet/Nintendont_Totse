@@ -35,6 +35,12 @@ FRESULT f_chdir_char(const char* path);
 FRESULT f_opendir_char(DIR* dp, const char* path);
 #endif /* _FS_MINIMIZE <= 1 */
 
+#if _FS_MINIMIZE == 0
+FRESULT f_stat_char(const char* path, FILINFO* fno);
+FRESULT f_unlink_char(const char* path);
+FRESULT f_rename_char(const char* path_old, const char* path_new);
+#endif /* _FS_MINIMIZE == 0 */
+
 #ifdef __cplusplus
 }
 #endif

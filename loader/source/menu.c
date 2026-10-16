@@ -41,6 +41,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "../../common/include/CommonConfigStrings.h"
 #include "ff_utf8.h"
 #include "ShowGameInfo.h"
+#include "loader_prefs.h"
+#include "theme.h"
+#include "flow.h"
+#include "covers.h"
+#include "loader_menu.h"
 
 // Dark gray for grayed-out menu items.
 #define DARK_GRAY 0x666666FF
@@ -70,6 +75,17 @@ const u32 DiscFormatColors[8] =
 	GRAY,		// undefined
 	GRAY,		// undefined
 };
+
+static u32 ListFormatColor(u8 format)
+{
+	static const u32 light[8] = {
+		0xFFFFFFFF, 0xFFCC88FF, 0x88FFAAFF, 0x88CCFFFF,
+		0xFFAAFFFF, 0xFFFF88FF, 0xC0C0C0FF, 0xC0C0C0FF
+	};
+	if (Theme_IsReady() && !Theme_IsClassic())
+		return light[format & 7];
+	return DiscFormatColors[format & 7];
+}
 
 /**
  * Print information about the selected device.
@@ -735,12 +751,12 @@ static bool UpdateGameSelectMenu(MenuCtx *ctx)
 		// TODO: Only if menuMode or scrollX has changed?
 
 		// Print the color codes.
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[0], MENU_POS_X, MENU_POS_Y + 20*3, "Colors  : 1:1");
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[1], MENU_POS_X+(14*10), MENU_POS_Y + 20*3, "Shrunk");
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[2], MENU_POS_X+(21*10), MENU_POS_Y + 20*3, "FST");
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[3], MENU_POS_X+(25*10), MENU_POS_Y + 20*3, "CISO");
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[4], MENU_POS_X+(30*10), MENU_POS_Y + 20*3, "Multi");
-		PrintFormat(DEFAULT_SIZE, DiscFormatColors[5], MENU_POS_X+(36*10), MENU_POS_Y + 20*3, "Over");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(0), MENU_POS_X, MENU_POS_Y + 20*3, "Colors  : 1:1");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(1), MENU_POS_X+(14*10), MENU_POS_Y + 20*3, "Shrunk");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(2), MENU_POS_X+(21*10), MENU_POS_Y + 20*3, "FST");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(3), MENU_POS_X+(25*10), MENU_POS_Y + 20*3, "CISO");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(4), MENU_POS_X+(30*10), MENU_POS_Y + 20*3, "Multi");
+		PrintFormat(DEFAULT_SIZE, ListFormatColor(5), MENU_POS_X+(36*10), MENU_POS_Y + 20*3, "Over");
 
 		// Starting position.
 		int gamelist_y = MENU_POS_Y + 20*5 + 10;
@@ -758,7 +774,7 @@ static bool UpdateGameSelectMenu(MenuCtx *ctx)
 
 			// Determine color based on disc format.
 			// NOTE: On Wii, DISC01 is GIFLAG_FORMAT_FULL.
-			const u32 color = DiscFormatColors[gi->Flags & GIFLAG_FORMAT_MASK];
+			const u32 color = ListFormatColor((u8)(gi->Flags & GIFLAG_FORMAT_MASK));
 
 			const u8 discNumber = ((gi->Flags & GIFLAG_DISCNUMBER_MASK) >> 5);
 			if (discNumber == 0)
@@ -803,7 +819,7 @@ static bool UpdateGameSelectMenu(MenuCtx *ctx)
 				const int len = strlen(gi->Path);
 				const int x = (640 - (len*10)) / 2;
 
-				const u32 color = DiscFormatColors[gi->Flags & GIFLAG_FORMAT_MASK];
+				const u32 color = ListFormatColor((u8)(gi->Flags & GIFLAG_FORMAT_MASK));
 				PrintFormat(DEFAULT_SIZE, color, x, MENU_POS_Y + 20*4+5, "%s", gi->Path);
 			}
 		}
@@ -1676,6 +1692,55 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
  * - 2 == go back and save settings (UNUSED)
  * - 3 == game selected and save settings
  */
+static int GameAbsIndex(const MenuCtx *ctx)
+{
+	int idx;
+
+	if (ctx->games.gamecount <= 0)
+		return 0;
+	idx = ctx->games.posX + ctx->games.scrollX;
+	if (idx < 0)
+		idx = 0;
+	if (idx >= ctx->games.gamecount)
+		idx = ctx->games.gamecount - 1;
+	return idx;
+}
+
+static void GameSetAbsIndex(MenuCtx *ctx, int absIndex)
+{
+	if (ctx->games.gamecount <= 0) {
+		ctx->games.posX = 0;
+		ctx->games.scrollX = 0;
+		return;
+	}
+	if (absIndex < 0)
+		absIndex = 0;
+	if (absIndex >= ctx->games.gamecount)
+		absIndex = ctx->games.gamecount - 1;
+	if (ctx->games.listMax > 0 && (u32)absIndex >= ctx->games.listMax) {
+		ctx->games.posX = (s32)ctx->games.listMax - 1;
+		ctx->games.scrollX = absIndex - (s32)ctx->games.listMax + 1;
+	} else {
+		ctx->games.posX = absIndex;
+		ctx->games.scrollX = 0;
+	}
+}
+
+static void ClearCheatOnGameChange(void)
+{
+	if ((ncfg->Config & NIN_CFG_CHEATS) && (ncfg->Config & NIN_CFG_CHEAT_PATH))
+		ncfg->Config = ncfg->Config & ~(NIN_CFG_CHEATS | NIN_CFG_CHEAT_PATH);
+}
+
+static bool CanShowGameInfo(int absIndex)
+{
+	if (IsWiiU() && !isWiiVC)
+		return true;
+	if (absIndex == 0)
+		return false;
+	return true;
+}
+
 static int SelectGame(void)
 {
 	// Depending on how many games are on the storage device,
@@ -1785,13 +1850,37 @@ static int SelectGame(void)
 
 			ctx.redraw = 1;
 		}
+		else if (ctx.menuMode == 0 && FPAD_Y(0))
+		{
+			int absIndex = GameAbsIndex(&ctx);
+			const gameinfo *picked = (ctx.games.gamecount > 0) ? &gi[absIndex] : NULL;
+			LoaderMenu_Run(picked);
+			ctx.redraw = true;
+		}
 
 		bool ret = false;
-		if (ctx.menuMode == 0) {
-			// Game Select menu.
+		if (ctx.menuMode == 0 && Prefs_GetView() == NIN_VIEW_FLOW) {
+			int absIndex = GameAbsIndex(&ctx);
+			int newIndex = absIndex;
+			FlowResult fr = Flow_Update(ctx.games.gi, ctx.games.gamecount, &newIndex);
+			if (newIndex != absIndex) {
+				GameSetAbsIndex(&ctx, newIndex);
+				ClearCheatOnGameChange();
+				ctx.saveSettings = true;
+				ctx.redraw = true;
+				absIndex = newIndex;
+			}
+			if (fr == FLOW_LAUNCH && ctx.games.gamecount > 0) {
+				ctx.games.canBeBooted = true;
+				ctx.selected = true;
+				ret = true;
+			} else if (fr == FLOW_INFO && ctx.games.gamecount > 0 && CanShowGameInfo(absIndex)) {
+				ShowGameInfo(&gi[absIndex]);
+				ctx.redraw = true;
+			}
+		} else if (ctx.menuMode == 0) {
 			ret = UpdateGameSelectMenu(&ctx);
 		} else {
-			// Settings menu.
 			ret = UpdateSettingsMenu(&ctx);
 		}
 
@@ -1803,6 +1892,24 @@ static int SelectGame(void)
 
 		if (ctx.redraw)
 		{
+			if (ctx.menuMode == 0 && Prefs_GetView() == NIN_VIEW_FLOW) {
+				int absIndex = GameAbsIndex(&ctx);
+				ctx.games.canBeBooted = (ctx.games.gamecount > 0);
+				ctx.games.canShowInfo = (ctx.games.gamecount > 0) && CanShowGameInfo(absIndex);
+				Flow_Draw(ctx.games.gi, ctx.games.gamecount, absIndex, NULL);
+				GRRLIB_Render();
+				Screenshot();
+				ClearScreen();
+				ctx.redraw = false;
+				if (ctx.games.gamecount > 0 && Covers_ShouldFetch(&gi[absIndex])) {
+					Flow_Draw(ctx.games.gi, ctx.games.gamecount, absIndex, "Fetching cover...");
+					GRRLIB_Render();
+					Screenshot();
+					ClearScreen();
+					Covers_Fetch(&gi[absIndex]);
+					ctx.redraw = true;
+				}
+			} else {
 			// Redraw the header.
 			PrintInfo();
 			if (ctx.menuMode == 0)
@@ -1815,6 +1922,7 @@ static int SelectGame(void)
 				// If the selected game is not DISC01, enable "Game Info".
 				color = ((ctx.games.canShowInfo) ? BLACK : DARK_GRAY);
 				PrintFormat(DEFAULT_SIZE, color, MENU_POS_X + 430, MENU_POS_Y + 20*3, "X/1 : Game Info");
+				PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X + 430, MENU_POS_Y + 20*4, "Y   : Options");
 			}
 			else
 			{
@@ -1835,6 +1943,7 @@ static int SelectGame(void)
 			Screenshot();
 			ClearScreen();
 			ctx.redraw = false;
+			}
 		}
 	}
 
@@ -1851,6 +1960,8 @@ static int SelectGame(void)
 		memcpy(&(ncfg->GameID), gi[SelectedGame].ID, 4);
 		DCFlushRange((void*)ncfg, sizeof(NIN_CFG));
 	}
+	Flow_Free();
+	Covers_Shutdown();
 	// Free allocated memory in the game list.
 	for (i = 0; i < gamecount; ++i)
 	{
@@ -1879,6 +1990,8 @@ bool SelectDevAndGame(void)
 	// Select the source device. (SD or USB)
 	bool SaveSettings = false;
 	bool redraw = true;	// Need to draw the menu the first time.
+	Prefs_Load();
+	Theme_Init();
 	while (1)
 	{
 		VIDEO_WaitVSync();
@@ -1888,13 +2001,23 @@ bool SelectDevAndGame(void)
 
 		if (redraw)
 		{
+			u32 fg = Theme_IsClassic() ? BLACK : Theme_ColorText();
 			UseSD = (ncfg->Config & NIN_CFG_USB) == 0;
-			PrintInfo();
-			PrintButtonActions("Exit", "Select", NULL, NULL);
-			PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X + 53 * 6 - 8, MENU_POS_Y + 20 * 6, UseSD ? ARROW_LEFT : "");
-			PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X + 53 * 6 - 8, MENU_POS_Y + 20 * 7, UseSD ? "" : ARROW_LEFT);
-			PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X + 47 * 6 - 8, MENU_POS_Y + 20 * 6, " SD  ");
-			PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X + 47 * 6 - 8, MENU_POS_Y + 20 * 7, "USB  ");
+			if (Theme_IsClassic()) {
+				PrintInfo();
+				PrintButtonActions("Exit", "Select", NULL, NULL);
+			} else {
+				Theme_DrawBackground();
+				PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X, MENU_POS_Y, "Choose a device");
+				PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 430, MENU_POS_Y, "Home: Exit");
+				PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 430, MENU_POS_Y + 20, "A   : Select");
+				PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 430, MENU_POS_Y + 40, "Y   : Options");
+			}
+			PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 53 * 6 - 8, MENU_POS_Y + 20 * 6, UseSD ? ARROW_LEFT : "");
+			PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 53 * 6 - 8, MENU_POS_Y + 20 * 7, UseSD ? "" : ARROW_LEFT);
+			PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 47 * 6 - 8, MENU_POS_Y + 20 * 6, " SD  ");
+			PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X + 47 * 6 - 8, MENU_POS_Y + 20 * 7, "USB  ");
+			PrintFormat(DEFAULT_SIZE, fg, MENU_POS_X, MENU_POS_Y + 20 * 9, "Y   : Options");
 			redraw = false;
 
 			// Render the screen here to prevent a blank frame
@@ -1925,8 +2048,16 @@ bool SelectDevAndGame(void)
 			ncfg->Config = ncfg->Config & ~NIN_CFG_USB;
 			redraw = true;
 		}
+		else if (FPAD_Y(0))
+		{
+			LoaderMenu_Run(NULL);
+			redraw = true;
+		}
 	}
 
+	if (MenuUI_TakeSettings())
+		SaveSettings = true;
+	MenuUI_Shutdown();
 	return SaveSettings;
 }
 

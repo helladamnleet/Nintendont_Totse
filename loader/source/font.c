@@ -29,10 +29,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "font.h"
 #include "global.h"
+#include "theme.h"
 
 void PrintFormat(u8 size, const u32 color, int x, int y, const char *str, ... )
 {
 	char astr[2048];
+	u32 draw = color;
 
 	va_list ap;
 	va_start( ap, str );
@@ -40,5 +42,13 @@ void PrintFormat(u8 size, const u32 color, int x, int y, const char *str, ... )
 	vsnprintf(astr, sizeof(astr), str, ap);
 
 	va_end( ap );
-	GRRLIB_PrintfTTF(x, y, myFont, astr, size, color);	
+	/* List, settings, and the message screens pass BLACK. On a dark theme
+	   that disappears, so map it to the theme text. */
+	if (Theme_IsReady() && !Theme_IsClassic()) {
+		if (draw == 0x000000FF)
+			draw = Theme_ColorText();
+		else if (draw == 0x666666FF)
+			draw = Theme_Current()->text_dim;
+	}
+	GRRLIB_PrintfTTF(x, y, myFont, astr, size, draw);
 }

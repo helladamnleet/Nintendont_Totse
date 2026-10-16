@@ -281,9 +281,21 @@ bool http_split_url (char **host, char **path, const char *url) {
 	return true;
 }
 
+static int http_redir_depth;
+
 bool http_request (const char *url, const u32 max_size) {
 	int linecount;
 	int sslcontext = -1;
+	char redirect[300];
+	if (http_host) {
+		free(http_host);
+		http_host = NULL;
+	}
+	if (http_path) {
+		free(http_path);
+		http_path = NULL;
+	}
+	redirect[0] = 0;
 	if (!http_split_url(&http_host, &http_path, url)) return false;
 
 	if (strncasecmp (url, "http://", 7) == 0)
@@ -304,7 +316,7 @@ bool http_request (const char *url, const u32 max_size) {
 	}
 	if(http_port == 443)
 	{
-		//patched out anyways so just to set something
+		ssl_init();
 		sslcontext = ssl_new((u8*)http_host,0);
 		if(sslcontext < 0)
 		{
@@ -337,6 +349,8 @@ bool http_request (const char *url, const u32 max_size) {
 	snprintf(request, 1024*2,
 		"GET %s HTTP/1.1\r\n"
 		"Host: %s\r\n"
+		"User-Agent: Nintendont\r\n"
+		"Connection: close\r\n"
 		"Cache-Control: no-cache\r\n\r\n",
 		http_path, http_host);
 
@@ -361,11 +375,28 @@ bool http_request (const char *url, const u32 max_size) {
 
 		sscanf (line, "HTTP/1.%*u %u", &http_status);
 		sscanf (line, "Content-Length: %u", &content_length);
+		if (strncasecmp(line, "Location:", 9) == 0) {
+			const char *loc = line + 9;
+			while (*loc == ' ' || *loc == '\t')
+				loc++;
+			strncpy(redirect, loc, sizeof(redirect) - 1);
+			redirect[sizeof(redirect) - 1] = 0;
+		}
 		gprintf(line);
 		gprintf("\n");
 		free (line);
 		line = NULL;
 
+	}
+	if ((http_status == 301 || http_status == 302 || http_status == 303 || http_status == 307)
+	    && redirect[0] && http_redir_depth < 2) {
+		if (http_port == 443)
+			ssl_shutdown(sslcontext);
+		net_close(s);
+		http_redir_depth++;
+		b = http_request(redirect, max_size);
+		http_redir_depth--;
+		return b;
 	}
 	if (linecount == 32 || !content_length) http_status = 404;
 	if (http_status != 200) {

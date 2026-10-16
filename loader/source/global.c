@@ -38,6 +38,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "Config.h"
 #include "exi.h"
 #include "global.h"
+#include "loader_menu.h"
+#include "theme.h"
 #include "font_zip.h"
 #include "dip.h"
 #include "unzip/unzip.h"
@@ -271,6 +273,8 @@ void ExitToLoader(int ret)
 {
 	extern vu32 KernelLoaded;
 
+	MenuUI_Shutdown();
+
 	UpdateScreen();
 	UpdateScreen(); // Triple render to ensure it gets seen
 	GRRLIB_Render();
@@ -304,6 +308,7 @@ void ExitToLoader(int ret)
 
 void LoaderShutdown()
 {
+	MenuUI_Shutdown();
 	GRRLIB_FreeTexture(background);
 	GRRLIB_FreeTexture(screen_buffer);
 	GRRLIB_FreeTTF(myFont);
@@ -361,6 +366,10 @@ bool LoadNinCFG(void)
 
 inline void ClearScreen()
 {
+	if (Theme_IsReady() && !Theme_IsClassic()) {
+		Theme_Paint();
+		return;
+	}
 	if (bg_isWidescreen)
 	{
 		// Clear the sides.

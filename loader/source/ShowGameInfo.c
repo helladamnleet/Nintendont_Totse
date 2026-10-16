@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "md5.h"
 #include "FPad.h"
 #include "font.h"
+#include "banner.h"
+#include "game_facts.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -270,7 +272,7 @@ static void DrawGameInfoScreen(const gameinfo *gi, const MD5VerifyState_t *md5)
 	// Maybe also show banner information? Both of these
 	// require extracting data from the file system.
 
-	static const char PressHome[] = "Press HOME (or START) to return to the game list.";
+	static const char PressHome[] = "HOME: back     Left/Right: description";
 	PrintFormat(DEFAULT_SIZE, BLACK, STR_CONST_X(PressHome), MENU_POS_Y + 20*19, PressHome);
 
 	// Button actions.
@@ -469,88 +471,203 @@ static PDI_RESULT ProcessDiscImage(const gameinfo *gi, MD5VerifyState_t *md5)
 	return (old_mb == new_mb ? PDI_NOT_DONE : PDI_NOT_DONE_MB);
 }
 
+static int wrap_lines(const char *text, int x, int y, int max_w, u8 size, u32 color, int max_lines, int skip)
+{
+	const char *p;
+	char line[96];
+	int drawn = 0;
+	int seen = 0;
+
+	if (!text)
+		return 0;
+	p = text;
+	while (*p && drawn < max_lines) {
+		int len = 0;
+		while (*p == ' ')
+			p++;
+		if (!*p)
+			break;
+		line[0] = 0;
+		while (*p) {
+			const char *word = p;
+			int wlen;
+			char trial[96];
+			while (*p && *p != ' ')
+				p++;
+			wlen = (int)(p - word);
+			if (wlen > 80)
+				wlen = 80;
+			if (len == 0) {
+				if (wlen > (int)sizeof(line) - 1)
+					wlen = (int)sizeof(line) - 1;
+				memcpy(line, word, (size_t)wlen);
+				line[wlen] = 0;
+				len = wlen;
+			} else {
+				if (len + 1 + wlen >= (int)sizeof(trial))
+					break;
+				memcpy(trial, line, (size_t)len);
+				trial[len] = ' ';
+				memcpy(trial + len + 1, word, (size_t)wlen);
+				trial[len + 1 + wlen] = 0;
+				if ((int)GRRLIB_WidthTTF(myFont, trial, size) > max_w) {
+					p = word;
+					break;
+				}
+				strcpy(line, trial);
+				len = (int)strlen(line);
+			}
+			while (*p == ' ')
+				p++;
+		}
+		if (line[0]) {
+			if (seen >= skip) {
+				PrintFormat(size, color, x, y + drawn * (size + 4), "%s", line);
+				drawn++;
+			}
+			seen++;
+		}
+	}
+	return seen;
+}
+
+extern const u8 esrb_ec_png[];
+extern const u8 esrb_e_png[];
+extern const u8 esrb_t_png[];
+extern const u8 esrb_m_png[];
+extern const u8 esrb_ao_png[];
+
+static GRRLIB_texImg *esrb_badge(const char *rating)
+{
+	static GRRLIB_texImg *ec, *e, *t, *m, *ao;
+	const char *code;
+	const u8 *png = NULL;
+	GRRLIB_texImg **slot = NULL;
+
+	if (!rating || !rating[0])
+		return NULL;
+	code = strrchr(rating, ' ');
+	code = code ? code + 1 : rating;
+	if (strcmp(code, "EC") == 0) {
+		png = esrb_ec_png;
+		slot = &ec;
+	} else if (strcmp(code, "E") == 0) {
+		png = esrb_e_png;
+		slot = &e;
+	} else if (strcmp(code, "T") == 0) {
+		png = esrb_t_png;
+		slot = &t;
+	} else if (strcmp(code, "M") == 0) {
+		png = esrb_m_png;
+		slot = &m;
+	} else if (strcmp(code, "AO") == 0) {
+		png = esrb_ao_png;
+		slot = &ao;
+	}
+	if (!png)
+		return NULL;
+	if (!*slot) {
+		*slot = GRRLIB_LoadTexture(png);
+		if (*slot) {
+			(*slot)->content_w = 80;
+			(*slot)->content_h = 112;
+		}
+	}
+	return *slot;
+}
+
+static void fact_line(int x, int *y, const char *label, const char *value)
+{
+	char line[96];
+
+	if (!value || !value[0])
+		return;
+	snprintf(line, sizeof(line), "%s: %s", label, value);
+	PrintFormat(15, BLACK, x, *y, "%s", line);
+	*y += 22;
+}
+
+static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int scroll)
+{
+	const GameBanner *ban = Banner_Get(gi);
+	const char *title = (ban && ban->title[0]) ? ban->title : (gi->Name ? gi->Name : "");
+	const char *body = facts->synopsis;
+	GRRLIB_texImg *badge = esrb_badge(facts->rating);
+	int lines;
+	int y = 88;
+
+	if (ban && ban->image) {
+		float vis_w = ban->image->content_w ? (float)ban->image->content_w : (float)ban->image->w;
+		float vis_h = ban->image->content_h ? (float)ban->image->content_h : (float)ban->image->h;
+		float s;
+		if (vis_w < 1.0f)
+			vis_w = 96.0f;
+		if (vis_h < 1.0f)
+			vis_h = 32.0f;
+		s = 200.0f / vis_w;
+		GRRLIB_DrawImg(28.0f, 58.0f, ban->image, 0, s, s, 0xFFFFFFFF);
+	}
+	PrintFormat(18, BLACK, 248, 58, "%s", title);
+	if (badge)
+		GRRLIB_DrawImg(536.0f, 52.0f, badge, 0, 0.8f, 0.8f, 0xFFFFFFFF);
+	else if (facts->rating[0])
+		PrintFormat(16, BLACK, 248, y, "%s", facts->rating), y += 22;
+	fact_line(248, &y, "Players", facts->players);
+	fact_line(248, &y, "Genre", facts->genre);
+	fact_line(248, &y, "Developer", facts->developer);
+	fact_line(248, &y, "Publisher", facts->publisher);
+	fact_line(248, &y, "Released", facts->released);
+	if (facts->content[0])
+		fact_line(248, &y, "Content", facts->content);
+	if (y < 168)
+		y = 168;
+	lines = wrap_lines(body, 28, y, 580, 15, BLACK, 12, scroll);
+	if (lines > 12)
+		PrintFormat(13, DARK_GRAY, 28, 430, "Up / Down for more");
+	PrintFormat(14, BLACK, 28, 452, "Home: back");
+}
+
 /**
  * Show a game's information.
  * @param gameinfo Game to display.
  */
 void ShowGameInfo(const gameinfo *gi)
 {
-	MD5VerifyState_t md5;
+	GameFacts facts;
+	int scroll = 0;
 
-	// Initialize the MD5 verification state.
-	memset(&md5, 0, sizeof(md5));
-	// If the selected game is 1:1, allow MD5 verification.
-	md5.supported = ((gi->Flags & GIFLAG_FORMAT_MASK) == GIFLAG_FORMAT_FULL);
-	if (md5.supported) {
-		// 1:1 image. MD5 can be checked.
-		// Load the database.
-		md5.db_status = LoadMD5Database(&md5.md5_db);
+	PrintFormat(DEFAULT_SIZE, BLACK, 28, 200, "Loading game info...");
+	GRRLIB_Render();
+	ClearScreen();
+	GameFacts_Load(gi, &facts);
+	if (!facts.synopsis[0]) {
+		const GameBanner *ban = Banner_Get(gi);
+		if (ban && ban->description[0]) {
+			strncpy(facts.synopsis, ban->description, sizeof(facts.synopsis) - 1);
+			facts.synopsis[sizeof(facts.synopsis) - 1] = 0;
+		}
 	}
 
-	// Wait for the user to press the Home button.
-	bool redraw = true;
-	while (1) {
-		if (redraw) {
-			// Show the game information.
-			DrawGameInfoScreen(gi, &md5);
-			// Render the text.
-			GRRLIB_Render();
-			ClearScreen();
-			redraw = false;
-		}
-
-		if (md5.running) {
-			// Process a megabyte of the MD5.
-			PDI_RESULT res = ProcessDiscImage(gi, &md5);
-			if (res != PDI_NOT_DONE) {
-				// Redraw required.
-				redraw = true;
-				// NOTE: Don't wait for VSync here,
-				// because that slows down the
-				// MD5 process significantly.
-				// (315.0s -> 355.7s)
+	{
+		bool redraw = true;
+		while (1) {
+			if (redraw) {
+				DrawDescriptionPage(gi, &facts, scroll);
+				GRRLIB_Render();
+				ClearScreen();
+				redraw = false;
 			}
-		} else {
-			// Wait for VBlank.
 			VIDEO_WaitVSync();
-		}
-
-		FPAD_Update();
-		if (FPAD_Start(0)) {
-			// If MD5 is running, cancel it.
-			if (md5.running) {
-				md5.running = false;
-				md5.cancelled = true;
-				CloseDiscImage(&md5);
-			}
-			// We're done here.
-			break;
-		} else if (FPAD_OK(0)) {
-			// If MD5 calculation is supported, and the
-			// MD5 calculation is either not in progress
-			// or has not been run, start it.
-			if (md5.supported && !md5.running && !md5.calculated) {
-				// Start the MD5 calculation.
-				OpenDiscImage(gi, &md5);
+			FPAD_Update();
+			if (FPAD_Start(0) || FPAD_Cancel(0))
+				break;
+			if (FPAD_Down(0)) {
+				scroll++;
+				redraw = true;
+			} else if (FPAD_Up(0) && scroll > 0) {
+				scroll--;
 				redraw = true;
 			}
-		} else if (FPAD_Cancel(0)) {
-			// If MD5 is running, cancel it.
-			if (md5.running) {
-				md5.running = false;
-				md5.cancelled = true;
-				CloseDiscImage(&md5);
-			}
 		}
 	}
-
-	if ((gi->Flags & GIFLAG_FORMAT_MASK) == GIFLAG_FORMAT_FULL) {
-		FreeMD5Database(&md5.md5_db);
-	}
-
-	// Free game entry information.
-	free(md5.db_entry.id6);
-	free(md5.db_entry.revision);
-	free(md5.db_entry.discnum);
-	free(md5.db_entry.title);
 }

@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <unistd.h>
 #include <locale.h>
 
+#include <ogc/card.h>
 #include "exi.h"
 #include "dip.h"
 #include "global.h"
@@ -291,7 +292,7 @@ static u32 CheckForMultiGameAndRegion(unsigned int CurDICMD, u32 *ISOShift, u32 
 				{
 					WDVD_FST_LSeek(0x8458);
 					read = WDVD_FST_Read(wdvdTmpBuf, sizeof(*BI2region));
-					memcpy(BI2region, wdvdTmpBuf, sizeof(*BI2region));
+					memcpy(&BI2region, wdvdTmpBuf, sizeof(*BI2region));
 				}
 				else
 				{
@@ -1058,6 +1059,21 @@ int main(int argc, char **argv)
 		}
 		else
 			ncfg->Language = NIN_LAN_ENGLISH;
+	}
+
+	/* No card in either slot: use the virtual card for this launch.
+	   The saved setting is left alone, so a card plugged in later is used again. */
+	if (!IsWiiU() && !(ncfg->Config & NIN_CFG_MEMCARDEMU))
+	{
+		s32 slotA;
+		s32 slotB;
+		CARD_Init(NULL, NULL);
+		slotA = CARD_ProbeEx(CARD_SLOTA, NULL, NULL);
+		slotB = CARD_ProbeEx(CARD_SLOTB, NULL, NULL);
+		CARD_Unmount(CARD_SLOTA);
+		CARD_Unmount(CARD_SLOTB);
+		if (slotA < 0 && slotB < 0)
+			ncfg->Config |= NIN_CFG_MEMCARDEMU;
 	}
 
 	if(ncfg->Config & NIN_CFG_MEMCARDEMU)

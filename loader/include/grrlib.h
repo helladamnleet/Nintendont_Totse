@@ -112,6 +112,8 @@ typedef  struct GRRLIB_drawSettings {
 typedef  struct GRRLIB_texImg {
     uint   w;           /**< The width of the texture in pixels.  */
     uint   h;           /**< The height of the texture in pixels. */
+    uint   content_w;   /**< Visible width. 0 means the whole texture. */
+    uint   content_h;   /**< Visible height. 0 means the whole texture. */
     int    handlex;     /**< Texture handle x. */
     int    handley;     /**< Texture handle y. */
     int    offsetx;     /**< Texture offset x. */

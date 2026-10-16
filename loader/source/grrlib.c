@@ -634,10 +634,9 @@ GRRLIB_texImg*  GRRLIB_LoadTexturePNG (const u8 *my_png) {
 			my_texture->w = width;
 			my_texture->h = height;
 			GRRLIB_SetHandle( my_texture, 0, 0 );
-			if(imgProp.imgWidth != width || imgProp.imgHeight != height) {
-				// PNGU has resized the texture
-				memset(my_texture->data, 0, (my_texture->h * my_texture->w) << 2);
-			}
+			/* PNGU rounds the size up to a multiple of 4. The pixels are
+			   already in the buffer; wiping them made every odd-sized
+			   cover download invisible. */
 			GRRLIB_FlushTex( my_texture );
 		}
 		PNGU_ReleaseImageContext(ctx);
@@ -953,11 +952,22 @@ static  guVector  axis = {0, 0, 1};
 void  GRRLIB_DrawImg (const f32 xpos, const f32 ypos, const GRRLIB_texImg *tex, const f32 degrees, const f32 scaleX, const f32 scaleY, const u32 color) {
 	GXTexObj  texObj;
 	u16       width, height;
+	u16       tex_w, tex_h, vis_w, vis_h;
+	f32       max_u, max_v;
 	Mtx       m, m1, m2, mv;
 
 	if (tex == NULL || tex->data == NULL)  return;
 
-	GX_InitTexObj(&texObj, tex->data, tex->w, tex->h,
+	tex_w = tex->w;
+	tex_h = tex->h;
+	vis_w = tex->content_w ? tex->content_w : tex->w;
+	vis_h = tex->content_h ? tex->content_h : tex->h;
+	if (vis_w > tex_w) vis_w = tex_w;
+	if (vis_h > tex_h) vis_h = tex_h;
+	max_u = (f32)vis_w / (f32)tex_w;
+	max_v = (f32)vis_h / (f32)tex_h;
+
+	GX_InitTexObj(&texObj, tex->data, tex_w, tex_h,
 				  GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
 
 	if (GRRLIB_Settings.antialias == false) {
@@ -978,14 +988,16 @@ void  GRRLIB_DrawImg (const f32 xpos, const f32 ypos, const GRRLIB_texImg *tex, 
 	guMtxRotAxisDeg(m2, &axis, degrees);
 	guMtxConcat    (m2, m1, m);
 
-	width  = tex->w * 0.5;
-	height = tex->h * 0.5;
+	width  = vis_w * 0.5;
+	height = vis_h * 0.5;
 
+	/* Scale is applied before this move. Use the scaled half-size so the
+	   picture stays on the point that was passed in. */
 	guMtxTransApply(m, m,
-		xpos +width  +tex->handlex
+		xpos + width * scaleX + tex->handlex
 			-tex->offsetx +( scaleX *(-tex->handley *sin(-DegToRad(degrees))
 									  -tex->handlex *cos(-DegToRad(degrees))) ),
-		ypos +height +tex->handley
+		ypos + height * scaleY + tex->handley
 			-tex->offsety +( scaleY *(-tex->handley *cos(-DegToRad(degrees))
 									  +tex->handlex *sin(-DegToRad(degrees))) ),
 		0);
@@ -999,15 +1011,15 @@ void  GRRLIB_DrawImg (const f32 xpos, const f32 ypos, const GRRLIB_texImg *tex, 
 
 		GX_Position3f32(width, -height, 0);
 		GX_Color1u32   (color);
-		GX_TexCoord2f32(1, 0);
+		GX_TexCoord2f32(max_u, 0);
 
 		GX_Position3f32(width, height, 0);
 		GX_Color1u32   (color);
-		GX_TexCoord2f32(1, 1);
+		GX_TexCoord2f32(max_u, max_v);
 
 		GX_Position3f32(-width, height, 0);
 		GX_Color1u32   (color);
-		GX_TexCoord2f32(0, 1);
+		GX_TexCoord2f32(0, max_v);
 	GX_End();
 	GX_LoadPosMtxImm(GXmodelView2D, GX_PNMTX0);
 
