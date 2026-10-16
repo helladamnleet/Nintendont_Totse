@@ -1,5 +1,11 @@
-### Nintendont
-A Wii Homebrew Project to play GC Games on Wii and vWii on Wii U
+### Nintendont Totse Edition
+A custom fork of Nintendont with some QoL improvements
+
+### Features added
+* Theme support
+* Nintendont now pulls box and disc art from GameTDB
+* Nintendont now pulls game synopsis and rating from GameTDB
+* Built in memory card manager
 
 ### Features:
 * Works on Wii and Wii U (in vWii mode)
@@ -20,6 +26,8 @@ A Wii Homebrew Project to play GC Games on Wii and vWii on Wii U
 * Disc switching
 * Use the official Nintendo GameCube controller adapter
 * BBA Emulation (see [BBA Emulation Readme](BBA_Readme.md))
+
+
 
 ### Features: (Wii only)
 * Play retail discs
