@@ -594,8 +594,10 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 	const char *body = facts->synopsis;
 	GRRLIB_texImg *badge = esrb_badge(facts->rating);
 	int lines;
-	int y = 88;
+	int y;
+	int title_lines;
 
+	/* Banner alone on the top row. Title starts below it. Rating sits beside the details. */
 	if (ban && ban->image) {
 		float vis_w = ban->image->content_w ? (float)ban->image->content_w : (float)ban->image->w;
 		float vis_h = ban->image->content_h ? (float)ban->image->content_h : (float)ban->image->h;
@@ -605,22 +607,33 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 		if (vis_h < 1.0f)
 			vis_h = 32.0f;
 		s = 200.0f / vis_w;
-		GRRLIB_DrawImg(28.0f, 58.0f, ban->image, 0, s, s, 0xFFFFFFFF);
+		GRRLIB_DrawImg(24.0f, 40.0f, ban->image, 0, s, s, 0xFFFFFFFF);
 	}
-	PrintFormat(18, BLACK, 248, 58, "%s", title);
+	title_lines = wrap_lines(title, 24, 130, 590, 16, BLACK, 2, 0);
+	if (title_lines < 1)
+		title_lines = 1;
+	y = 130 + title_lines * 22 + 10;
 	if (badge)
-		GRRLIB_DrawImg(536.0f, 52.0f, badge, 0, 0.8f, 0.8f, 0xFFFFFFFF);
+		GRRLIB_DrawImg(520.0f, (float)y, badge, 0, 0.85f, 0.85f, 0xFFFFFFFF);
 	else if (facts->rating[0])
-		PrintFormat(16, BLACK, 248, y, "%s", facts->rating), y += 22;
-	fact_line(248, &y, "Players", facts->players);
-	fact_line(248, &y, "Genre", facts->genre);
-	fact_line(248, &y, "Developer", facts->developer);
-	fact_line(248, &y, "Publisher", facts->publisher);
-	fact_line(248, &y, "Released", facts->released);
-	if (facts->content[0])
-		fact_line(248, &y, "Content", facts->content);
-	if (y < 168)
-		y = 168;
+		fact_line(24, &y, "Rating", facts->rating);
+	fact_line(24, &y, "Players", facts->players);
+	fact_line(24, &y, "Genre", facts->genre);
+	fact_line(24, &y, "Developer", facts->developer);
+	fact_line(24, &y, "Publisher", facts->publisher);
+	fact_line(24, &y, "Released", facts->released);
+	if (facts->content[0]) {
+		char content_line[120];
+		int content_lines;
+		snprintf(content_line, sizeof(content_line), "Content: %s", facts->content);
+		content_lines = wrap_lines(content_line, 24, y, 480, 15, BLACK, 2, 0);
+		if (content_lines < 1)
+			content_lines = 1;
+		if (content_lines > 2)
+			content_lines = 2;
+		y += content_lines * 20;
+	}
+	y += 8;
 	lines = wrap_lines(body, 28, y, 580, 15, BLACK, 12, scroll);
 	if (lines > 12)
 		PrintFormat(13, DARK_GRAY, 28, 430, "Up / Down for more");
