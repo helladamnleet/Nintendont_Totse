@@ -7,6 +7,14 @@ A custom fork of Nintendont with some QoL improvements
 * Nintendont now pulls game synopsis and rating from GameTDB
 * Built in memory card manager
 
+### Latest Screenshots
+<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/35a11f7e-c814-47ff-a29f-ebd6294a6f03" />
+<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/0f8482c3-84e6-4bb9-a94b-9f8994134737" />
+<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/ab9d218d-5e81-4e6f-9ea9-2580e0a8fb2b" />
+
+
+
+
 ### Features:
 * Works on Wii and Wii U (in vWii mode)
 * Full-speed loading from a USB device or an SD card.
