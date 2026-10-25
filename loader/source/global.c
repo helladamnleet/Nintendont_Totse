@@ -39,6 +39,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "exi.h"
 #include "global.h"
 #include "loader_menu.h"
+#include "loader_prefs.h"
 #include "theme.h"
 #include "font_zip.h"
 #include "dip.h"
@@ -53,6 +54,53 @@ GRRLIB_texImg *screen_buffer;
 static bool bg_isWidescreen = false;
 static float bg_xScale = 1.0f;
 static int bg_xPos = 0;
+
+extern char launch_dir[];
+
+/* Read loader.ini before the splash so startup uses the saved theme.
+   The card is unmounted again before the IOS reload. */
+static int saved_theme_present(void)
+{
+	char path[260];
+	FIL fp;
+
+	if (launch_dir[0])
+		snprintf(path, sizeof(path), "%sloader.ini", launch_dir);
+	else
+		snprintf(path, sizeof(path), "/apps/Nintendont/loader.ini");
+	if (f_open_char(&fp, path, FA_READ | FA_OPEN_EXISTING) != FR_OK)
+		return 0;
+	f_close(&fp);
+	return 1;
+}
+
+static void load_saved_theme(void)
+{
+	BYTE drives[2];
+	int n;
+
+	drives[0] = DEV_SD;
+	drives[1] = DEV_USB;
+	if (launch_dir[0] == 'u' || launch_dir[0] == 'U') {
+		drives[0] = DEV_USB;
+		drives[1] = DEV_SD;
+	}
+	for (n = 0; n < 2; n++) {
+		const WCHAR *mnt = MountDevice(drives[n]);
+		if (!mnt)
+			continue;
+		f_chdrive(mnt);
+		f_chdir_char("/");
+		if (saved_theme_present()) {
+			Prefs_Load();
+			Theme_Init();
+			break;
+		}
+		UnmountDevice(drives[n]);
+	}
+	UnmountDevice(DEV_SD);
+	UnmountDevice(DEV_USB);
+}
 
 u32 POffset;
 
@@ -207,20 +255,28 @@ void Initialise(bool autoboot)
 		bg_xPos = 0;
 	}
 
+	load_saved_theme();
+
 	if(autoboot == false)
 	{
-		for (i=0; i<255; i +=5) // Fade background image in from black screen
-		{
-			if (bg_isWidescreen)
-			{
-				// Clear the sides.
-				GRRLIB_Rectangle(0, 0, 80, 480, RGBA(222, 223, 224, i), true);
-				GRRLIB_Rectangle(80+480, 0, 80, 480, RGBA(222, 223, 224, i), true);
-			}
-			GRRLIB_DrawImg(bg_xPos, 0, background, 0, bg_xScale, 1, RGBA(255, 255, 255, i)); // Opacity increases as i does
+		if (Theme_IsReady() && !Theme_IsClassic()) {
+			Theme_DrawBackground();
 			GRRLIB_Render();
+			ClearScreen();
+		} else {
+			for (i=0; i<255; i +=5) // Fade background image in from black screen
+			{
+				if (bg_isWidescreen)
+				{
+					// Clear the sides.
+					GRRLIB_Rectangle(0, 0, 80, 480, RGBA(222, 223, 224, i), true);
+					GRRLIB_Rectangle(80+480, 0, 80, 480, RGBA(222, 223, 224, i), true);
+				}
+				GRRLIB_DrawImg(bg_xPos, 0, background, 0, bg_xScale, 1, RGBA(255, 255, 255, i)); // Opacity increases as i does
+				GRRLIB_Render();
+			}
+			ClearScreen();
 		}
-		ClearScreen();
 	}
 	gprintf("Initialize Finished\r\n");
 }
@@ -472,6 +528,11 @@ void UpdateNinCFG()
 		ncfg->Version = 10;
 	}
 	if (ncfg->Version == 10)
+	{	// Hybrid EXI, disabled by default
+		ncfg->Config &= ~NIN_CFG_HYBRID_EXI;
+		ncfg->Version = 11;
+	}
+	if (ncfg->Version == 11)
 	{
 		// NIN_CFG with version 10 may have loaded
 		// garbage bytes into WiiUGamepadSlot so sanitize

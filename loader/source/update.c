@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <network.h>
 #include <zlib.h>
 #include <ogc/lwp_watchdog.h>
+#include "theme.h"
 #include <sys/param.h>
 
 #include "exi.h"
@@ -180,8 +181,12 @@ static s32 Download(DOWNLOADS download_number)  {
 	bool dir_argument_exists = (launch_dir[0] != 0);
 	const char *dir = (dir_argument_exists ? launch_dir : "/apps/Nintendont/");
 
-	ClearScreen();
-	PrintInfo();
+	if (Theme_IsClassic()) {
+		ClearScreen();
+		PrintInfo();
+	} else {
+		Theme_DrawBackground();
+	}
 
 	snprintf(filepath, sizeof(filepath), "%s%s", dir, Downloads[download_number].filename);
 	PrintFormat(DEFAULT_SIZE, BLACK, MENU_POS_X, MENU_POS_Y + 20*line, Downloads[download_number].text);
@@ -319,7 +324,10 @@ void UpdateNintendont(void) {
 
 	while (true) {
 		if (redraw) {
-			PrintInfo();
+			if (Theme_IsClassic())
+				PrintInfo();
+			else
+				Theme_DrawBackground();
 			PrintButtonActions("Go Back", "Update", NULL, NULL);
 
 			// Update menu.

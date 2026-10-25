@@ -130,6 +130,70 @@ static void fill_gamecube(NinTheme *t)
 	t->wordmark = true;
 }
 
+static void fill_halloween(NinTheme *t)
+{
+	memset(t, 0, sizeof(*t));
+	strcpy(t->id, "halloween");
+	strcpy(t->name, "Halloween");
+	t->bg_top = 0x080110FF;
+	t->bg_mid = 0x2A0840FF;
+	t->bg_bottom = 0x06010CFF;
+	t->header = 0x000000FF;
+	t->text = 0xF0A018FF;
+	t->text_dim = 0xC08020FF;
+	t->accent = 0xF0A018FF;
+	t->panel = 0x20003088;
+	t->frame = 0xF0A018FF;
+	t->placeholder = 0x3A1058FF;
+	t->highlight = 0xE07098FF;
+	t->classic = false;
+	t->header_bar = true;
+	t->wordmark = true;
+}
+
+static void fill_thanksgiving(NinTheme *t)
+{
+	memset(t, 0, sizeof(*t));
+	strcpy(t->id, "thanksgiving");
+	strcpy(t->name, "Thanksgiving");
+	t->bg_top = 0xA25814FF;
+	t->bg_mid = 0xA25814FF;
+	t->bg_bottom = 0xA25814FF;
+	t->header = 0xA25814FF;
+	t->text = 0xFFF3D4FF;
+	t->text_dim = 0xE4C48CFF;
+	t->accent = 0xFFF3D4FF;
+	t->panel = 0x00000000;
+	t->frame = 0x5C3010FF;
+	t->placeholder = 0x8A4A16FF;
+	t->highlight = 0xC47830FF;
+	t->classic = false;
+	/* The artwork is the full screen, including the top edge. A bar would cover it. */
+	t->header_bar = false;
+	t->wordmark = false;
+}
+
+static void fill_christmas(NinTheme *t)
+{
+	memset(t, 0, sizeof(*t));
+	strcpy(t->id, "christmas");
+	strcpy(t->name, "Christmas");
+	t->bg_top = 0x8C0815FF;
+	t->bg_mid = 0x8C0815FF;
+	t->bg_bottom = 0x8C0815FF;
+	t->header = 0x8C0815FF;
+	t->text = 0xFFF6E8FF;
+	t->text_dim = 0xF0D7A4FF;
+	t->accent = 0xFFF6E8FF;
+	t->panel = 0x00000000;
+	t->frame = 0xF0D7A4FF;
+	t->placeholder = 0x6A1018FF;
+	t->highlight = 0xA01020FF;
+	t->classic = false;
+	t->header_bar = false;
+	t->wordmark = false;
+}
+
 static void fill_classic(NinTheme *t)
 {
 	memset(t, 0, sizeof(*t));
@@ -148,6 +212,52 @@ static void fill_classic(NinTheme *t)
 	t->classic = true;
 	t->header_bar = false;
 	t->wordmark = false;
+}
+
+extern const u8 halloween_png[];
+extern const u8 thanksgiving_png[];
+extern const u8 christmas_png[];
+
+static uint next_pot(uint v)
+{
+	uint p = 1;
+	if (v < 1)
+		return 1;
+	while (p < v)
+		p <<= 1;
+	return p;
+}
+
+/* The Wii only samples power-of-two textures. Keep the real picture size. */
+static GRRLIB_texImg *fit_texture(GRRLIB_texImg *src)
+{
+	uint nw;
+	uint nh;
+	uint x;
+	uint y;
+	GRRLIB_texImg *dst;
+
+	if (!src || !src->data)
+		return src;
+	nw = next_pot(src->w);
+	nh = next_pot(src->h);
+	if (nw == src->w && nh == src->h) {
+		src->content_w = src->w;
+		src->content_h = src->h;
+		return src;
+	}
+	dst = GRRLIB_CreateEmptyTexture(nw, nh);
+	if (!dst)
+		return src;
+	for (y = 0; y < src->h; y++) {
+		for (x = 0; x < src->w; x++)
+			GRRLIB_SetPixelTotexImg((int)x, (int)y, dst, GRRLIB_GetPixelFromtexImg((int)x, (int)y, src));
+	}
+	dst->content_w = src->w;
+	dst->content_h = src->h;
+	GRRLIB_FlushTex(dst);
+	GRRLIB_FreeTexture(src);
+	return dst;
 }
 
 static GRRLIB_texImg *load_png(const char *path)
@@ -183,7 +293,7 @@ static GRRLIB_texImg *load_png(const char *path)
 			GRRLIB_FreeTexture(tex);
 		return NULL;
 	}
-	return tex;
+	return fit_texture(tex);
 }
 
 static void load_background(void)
@@ -191,6 +301,21 @@ static void load_background(void)
 	if (bg_tex) {
 		GRRLIB_FreeTexture(bg_tex);
 		bg_tex = NULL;
+	}
+	if (key_eq(themes[theme_index].id, "halloween")) {
+		GRRLIB_texImg *tex = GRRLIB_LoadTexture(halloween_png);
+		bg_tex = fit_texture(tex);
+		return;
+	}
+	if (key_eq(themes[theme_index].id, "thanksgiving")) {
+		GRRLIB_texImg *tex = GRRLIB_LoadTexture(thanksgiving_png);
+		bg_tex = fit_texture(tex);
+		return;
+	}
+	if (key_eq(themes[theme_index].id, "christmas")) {
+		GRRLIB_texImg *tex = GRRLIB_LoadTexture(christmas_png);
+		bg_tex = fit_texture(tex);
+		return;
 	}
 	if (themes[theme_index].background[0])
 		bg_tex = load_png(themes[theme_index].background);
@@ -238,6 +363,8 @@ static void apply_ini_line(NinTheme *t, const char *folder, char *line)
 		t->frame = parse_color(val, t->frame);
 	else if (key_eq(key, "placeholder"))
 		t->placeholder = parse_color(val, t->placeholder);
+	else if (key_eq(key, "highlight"))
+		t->highlight = parse_color(val, t->highlight);
 	else if (key_eq(key, "header_bar"))
 		t->header_bar = flag_on(val);
 	else if (key_eq(key, "wordmark"))
@@ -326,7 +453,10 @@ void Theme_Init(void)
 {
 	fill_gamecube(&themes[0]);
 	fill_classic(&themes[1]);
-	theme_count = 2;
+	fill_halloween(&themes[2]);
+	fill_thanksgiving(&themes[3]);
+	fill_christmas(&themes[4]);
+	theme_count = 5;
 	theme_index = 0;
 	scan_folders();
 	if (!Theme_SetByName(Prefs_GetTheme()))
@@ -428,7 +558,18 @@ static void paint_theme(bool with_header)
 	int y;
 
 	if (bg_tex) {
-		GRRLIB_DrawImg(0, 0, bg_tex, 0, 640.0f / (float)bg_tex->w, 480.0f / (float)bg_tex->h, 0xFFFFFFFF);
+		float cw = bg_tex->content_w ? (float)bg_tex->content_w : (float)bg_tex->w;
+		float ch = bg_tex->content_h ? (float)bg_tex->content_h : (float)bg_tex->h;
+		if (cw < 1.0f)
+			cw = 1.0f;
+		if (ch < 1.0f)
+			ch = 1.0f;
+		{
+			bool aa = GRRLIB_GetAntiAliasing();
+			GRRLIB_SetAntiAliasing(false);
+			GRRLIB_DrawImg(0, 0, bg_tex, 0, 640.0f / cw, 480.0f / ch, 0xFFFFFFFF);
+			GRRLIB_SetAntiAliasing(aa);
+		}
 	} else {
 		for (y = 0; y < 480; y += 8) {
 			u32 c;

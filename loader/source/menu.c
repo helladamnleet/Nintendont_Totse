@@ -747,6 +747,8 @@ static bool UpdateGameSelectMenu(MenuCtx *ctx)
 
 	if (ctx->redraw)
 	{
+		if (!Theme_IsClassic())
+			Theme_DrawBackground();
 		// Redraw the game list.
 		// TODO: Only if menuMode or scrollX has changed?
 
@@ -1113,6 +1115,20 @@ static const char *const *GetSettingsDescription(const MenuCtx *ctx)
 				return desc_skip_netprof;
 			}
 
+			case 9: {
+				static const char *desc_hybrid_exi[] = {
+					"If virtual memory card is",
+					"enabled, this option enables",
+					"slot 2 (Slot B) for hardware",
+					"peripherals such as the",
+					"microphone. Does nothing",
+					"on Wii U.",
+					"(Experimental)",
+					NULL
+				};
+				return desc_hybrid_exi;
+			}
+
 			default:
 				break;
 		}
@@ -1169,7 +1185,7 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 
 		// Check for wraparound.
 		if ((ctx->settings.settingPart == 0 && ctx->settings.posX >= NIN_SETTINGS_LAST) ||
-		    (ctx->settings.settingPart == 1 && ctx->settings.posX >= 9))
+		    (ctx->settings.settingPart == 1 && ctx->settings.posX >= 10))
 		{
 			ctx->settings.posX = 0;
 			ctx->settings.settingPart ^= 1;
@@ -1196,7 +1212,7 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 			if (ctx->settings.settingPart == 0) {
 				ctx->settings.posX = NIN_SETTINGS_LAST - 1;
 			} else {
-				ctx->settings.posX = 8;
+				ctx->settings.posX = 9;
 			}
 		}
 
@@ -1453,6 +1469,12 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 					ctx->redraw = true;
 					break;
 
+				case 9:
+					ctx->saveSettings = true;
+					ncfg->Config ^= NIN_CFG_HYBRID_EXI;
+					ctx->redraw = true;
+					break;
+
 				default:
 					break;
 			}
@@ -1461,6 +1483,8 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 
 	if (ctx->redraw)
 	{
+		if (!Theme_IsClassic())
+			Theme_DrawBackground();
 		// Redraw the settings menu.
 		u32 ListLoopIndex = 0;
 
@@ -1645,6 +1669,13 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 		}
 		ListLoopIndex++;
 
+		PrintFormat(MENU_SIZE,
+				(IsWiiU() || !(ncfg->Config & NIN_CFG_MEMCARDEMU)) ? DARK_GRAY : BLACK,
+				MENU_POS_X + 320, SettingY(ListLoopIndex),
+				"%-18s:%-4s", "hybrid EXI",
+				(ncfg->Config & NIN_CFG_HYBRID_EXI) ? "On" : "Off");
+		ListLoopIndex++;
+
 		// Draw the cursor.
 		u32 cursor_color = BLACK;
 		if (ctx->settings.settingPart == 0) {
@@ -1659,6 +1690,8 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 		} else {
 			if((IsWiiU() || !(ncfg->Config & (NIN_CFG_BBA_EMU))) && ctx->settings.posX == 7)
 				cursor_color = DARK_GRAY;
+			if((IsWiiU() || !(ncfg->Config & NIN_CFG_MEMCARDEMU)) && ctx->settings.posX == 9)
+				cursor_color = DARK_GRAY;
 			PrintFormat(MENU_SIZE, cursor_color, MENU_POS_X + 300, SettingY(ctx->settings.posX), ARROW_RIGHT);
 		}
 
@@ -1668,7 +1701,7 @@ static bool UpdateSettingsMenu(MenuCtx *ctx)
 		const char *const *desc = GetSettingsDescription(ctx);
 		if (desc != NULL)
 		{
-			int line_num = 9;
+			int line_num = 10;
 			do {
 				if (**desc != 0)
 				{
@@ -1910,8 +1943,8 @@ static int SelectGame(void)
 					ctx.redraw = true;
 				}
 			} else {
-			// Redraw the header.
-			PrintInfo();
+			if (Theme_IsClassic())
+				PrintInfo();
 			if (ctx.menuMode == 0)
 			{
 				// Game List menu.
@@ -2070,8 +2103,12 @@ void ShowMessageScreen(const char *msg)
 	const int len = strlen(msg);
 	const int x = (640 - (len*10)) / 2;
 
-	ClearScreen();
-	PrintInfo();
+	if (Theme_IsClassic()) {
+		ClearScreen();
+		PrintInfo();
+	} else {
+		Theme_DrawBackground();
+	}
 	PrintFormat(DEFAULT_SIZE, BLACK, x, 232, "%s", msg);
 	GRRLIB_Render();
 	ClearScreen();
@@ -2088,8 +2125,12 @@ void ShowMessageScreenAndExit(const char *msg, int ret)
 	const int x = (640 - (len*10)) / 2;
 	const u32 color = (ret == 0 ? BLACK : MAROON);
 
-	ClearScreen();
-	PrintInfo();
+	if (Theme_IsClassic()) {
+		ClearScreen();
+		PrintInfo();
+	} else {
+		Theme_DrawBackground();
+	}
 	PrintFormat(DEFAULT_SIZE, color, x, 232, "%s", msg);
 	ExitToLoader(ret);
 }

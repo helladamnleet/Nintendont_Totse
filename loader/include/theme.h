@@ -1,8 +1,9 @@
 /*
  * Visual themes for the game browser.
  *
- * Built in: "gamecube" (the purple IPL-style menu) and "classic" (the
- * original text list on the stock backdrop).
+ * Built in: "gamecube" (the purple IPL-style menu), "classic" (the
+ * original text list on the stock backdrop), "halloween", "thanksgiving",
+ * and "christmas".
  *
  * Drop-in themes live in themes/<folder>/theme.ini next to boot.dol.
  * See LOADER_UI.md for the keys. To add a built-in theme, add one
@@ -26,6 +27,7 @@ typedef struct NinTheme {
 	u32 panel;
 	u32 frame;
 	u32 placeholder;
+	u32 highlight; /* pill behind a line, 0 if unused */
 	char background[256]; /* optional PNG, empty if unused */
 	bool classic;         /* stock backdrop, dark text */
 	bool header_bar;

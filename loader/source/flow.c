@@ -277,10 +277,8 @@ void Flow_Draw(const gameinfo *games, int count, int selected, const char *statu
 {
 	if (Theme_IsClassic())
 		draw_plain(games, count, selected, status);
-	else if (Theme_Current()->wordmark)
-		draw_gamecube(games, count, selected, status);
 	else
-		draw_plain(games, count, selected, status);
+		draw_gamecube(games, count, selected, status);
 }
 
 void Flow_Free(void)

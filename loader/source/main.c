@@ -586,6 +586,12 @@ int main(int argc, char **argv)
 	//Meh, doesnt do anything anymore anyways
 	//STM_RegisterEventHandler(HandleSTMEvent);
 
+	if (argc > 0 && argv != NULL && argv[0] != NULL) {
+		char *first_slash = strrchr(argv[0], '/');
+		if (first_slash != NULL)
+			strncpy(launch_dir, argv[0], first_slash - argv[0] + 1);
+	}
+
 	Initialise(argsboot);
 
 	//for BT.c

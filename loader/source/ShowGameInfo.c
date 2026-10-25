@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "font.h"
 #include "banner.h"
 #include "game_facts.h"
+#include "theme.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -596,7 +597,9 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 	int lines;
 	int y;
 	int title_lines;
+	const NinTheme *theme = Theme_Current();
 
+	Theme_DrawBackground();
 	/* Banner alone on the top row. Title starts below it. Rating sits beside the details. */
 	if (ban && ban->image) {
 		float vis_w = ban->image->content_w ? (float)ban->image->content_w : (float)ban->image->w;
@@ -607,7 +610,7 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 		if (vis_h < 1.0f)
 			vis_h = 32.0f;
 		s = 200.0f / vis_w;
-		GRRLIB_DrawImg(24.0f, 40.0f, ban->image, 0, s, s, 0xFFFFFFFF);
+		GRRLIB_DrawImg(24.0f, 52.0f, ban->image, 0, s, s, 0xFFFFFFFF);
 	}
 	title_lines = wrap_lines(title, 24, 130, 590, 16, BLACK, 2, 0);
 	if (title_lines < 1)
@@ -626,7 +629,12 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 		char content_line[120];
 		int content_lines;
 		snprintf(content_line, sizeof(content_line), "Content: %s", facts->content);
-		content_lines = wrap_lines(content_line, 24, y, 480, 15, BLACK, 2, 0);
+		if (theme->highlight) {
+			GRRLIB_Circle(28, (f32)y + 8, 11, theme->highlight, true);
+			GRRLIB_Circle(612, (f32)y + 8, 11, theme->highlight, true);
+			GRRLIB_Rectangle(28, (f32)y - 3, 584, 22, theme->highlight, true);
+		}
+		content_lines = wrap_lines(content_line, 36, y, 560, 15, BLACK, 2, 0);
 		if (content_lines < 1)
 			content_lines = 1;
 		if (content_lines > 2)
@@ -634,10 +642,8 @@ static void DrawDescriptionPage(const gameinfo *gi, const GameFacts *facts, int 
 		y += content_lines * 20;
 	}
 	y += 8;
-	lines = wrap_lines(body, 28, y, 580, 15, BLACK, 12, scroll);
-	if (lines > 12)
-		PrintFormat(13, DARK_GRAY, 28, 430, "Up / Down for more");
-	PrintFormat(14, BLACK, 28, 452, "Home: back");
+	lines = wrap_lines(body, 28, y, 580, 15, BLACK, 14, scroll);
+	(void)lines;
 }
 
 /**
