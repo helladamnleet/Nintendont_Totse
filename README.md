@@ -1,10 +1,14 @@
 ### Nintendont
-A Wii Homebrew Project to play GC Games on Wii and vWii on Wii U
+A custom fork of Nintendont that adds
+- Theme support
+- GameCube Flow
+- Automatically fetches cover art from GameTDB
 
 ### Latest Screenshots
-<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/35a11f7e-c814-47ff-a29f-ebd6294a6f03" />
-<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/0f8482c3-84e6-4bb9-a94b-9f8994134737" />
-<img width="4000" height="2252" alt="image" src="https://github.com/user-attachments/assets/ab9d218d-5e81-4e6f-9ea9-2580e0a8fb2b" />
+<img width="4000" height="2252" alt="Nintendont_Halloween" src="https://github.com/user-attachments/assets/00fcf468-1cac-428d-9ab9-9640c8ab84e9" />
+<img width="4000" height="2252" alt="Nintendont_Thanksgiving" src="https://github.com/user-attachments/assets/88d3e5e3-a3ac-4ba6-b00d-0c8d24fc4449" />
+<img width="4000" height="2252" alt="Nintendont_Christmas" src="https://github.com/user-attachments/assets/08a83018-dee8-4996-8c63-c3efa6948ac9" />
+
 
 
 
